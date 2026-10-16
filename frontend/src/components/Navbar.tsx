@@ -11,7 +11,7 @@ export default function Navbar() {
     { href: '/', label: 'Beranda', icon: Activity },
     { href: '/booking', label: 'Booking Pasien', icon: Calendar },
     { href: '/dashboard', label: 'Dashboard Petugas', icon: Users },
-    { href: '/skenario', label: 'Panel Skenario (What-If)', icon: Sliders },
+    { href: '/skenario', label: 'Simulasi Kapasitas', icon: Sliders },
   ];
 
   return (

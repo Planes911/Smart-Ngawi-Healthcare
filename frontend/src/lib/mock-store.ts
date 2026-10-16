@@ -43,8 +43,13 @@ export const PUSKESMAS_NGAWI: Puskesmas[] = [
   },
 ];
 
+// Helper untuk menghasilkan timestamp dinamis agar dashboard selalu terasa "live saat ini"
+const nowTimestamp = Date.now();
+const minutesAgo = (mins: number) => new Date(nowTimestamp - mins * 60 * 1000).toISOString();
+
 // In-memory initial queue data for instant demo
 const INITIAL_QUEUE: QueueTicket[] = [
+  // 1. Kasus Sedang Berjalan di Poli (Pemeriksaan Aktif)
   {
     id: 'q-001',
     puskesmasId: 'pusk-ngw-01',
@@ -58,18 +63,20 @@ const INITIAL_QUEUE: QueueTicket[] = [
     urgencyScore: 18,
     estWaitMinP50: 0,
     estWaitMinP90: 5,
-    registeredAt: '2026-10-16T07:45:00.000Z',
-    serviceStartedAt: '2026-10-16T08:00:00.000Z',
+    registeredAt: minutesAgo(24),
+    serviceStartedAt: minutesAgo(6),
     assignedCounter: 'Poli Umum 1',
     polyType: 'Poli Umum',
     symptomsList: ['cough_mild', 'runny_nose'],
     soapDraft: {
-      subjective: 'Pasien batuk berdahak 3 hari, demam ringan hilang timbul.',
-      objectiveNeeded: 'Cek suhu aksila dan auskultasi paru.',
-      preliminaryAssessment: 'ISPA Non-Spesifik Ringan.',
-      suggestedPlan: 'Ekspektoran oral, parasetamol 500mg prn, edukasi minum air hangat.',
+      subjective: 'Pasien mengeluh batuk berdahak 3 hari, pilek, demam sumer (37.8°C), tidak ada sesak napas.',
+      objectiveNeeded: 'Auskultasi paru (suara napas vesikuler), inspeksi faring hiperemis, ukur suhu aksila.',
+      preliminaryAssessment: 'ISPA Akut / Common Cold Non-Spesifik (Derajat Ringan).',
+      suggestedPlan: 'Guaifenesin 100mg 3x1, Parasetamol 500mg prn demam, edukasi hidrasi dan istirahat cukup.',
     },
   },
+
+  // 2. Kasus Prioritas Mendesak (Kuning - Dehidrasi Akut)
   {
     id: 'q-002',
     puskesmasId: 'pusk-ngw-01',
@@ -83,60 +90,65 @@ const INITIAL_QUEUE: QueueTicket[] = [
     urgencyScore: 55,
     estWaitMinP50: 12,
     estWaitMinP90: 18,
-    registeredAt: '2026-10-16T07:55:00.000Z',
+    registeredAt: minutesAgo(16),
     polyType: 'Poli Umum',
     symptomsList: ['acute_abdominal_pain', 'severe_vomiting_diarrhea'],
     soapDraft: {
-      subjective: 'Muntah dan buang air cair 6 kali sejak subuh, lemas, haus terus menerus.',
-      objectiveNeeded: 'Cek turgor kulit, mata cekung, tekanan darah dan nadi postural.',
-      preliminaryAssessment: 'Gastroenteritis Akut dengan Dehidrasi Ringan-Sedang.',
-      suggestedPlan: 'Oralit ad libitum, Zinc 20mg, probiotik, observasi 1 jam.',
+      subjective: 'Muntah dan BAB cair lebih dari 6 kali sejak subuh, badan sangat lemas, rasa haus terus menerus.',
+      objectiveNeeded: 'Evaluasi turgor kulit dinding abdomen, cek mata cekung, tensimeter postural, dan frekuensi nadi.',
+      preliminaryAssessment: 'Gastroenteritis Akut (GEA) dengan Dehidrasi Ringan-Sedang.',
+      suggestedPlan: 'Rehidrasi oral segera (Oralit ad libitum), Zinc 20mg 1x1, tablet probiotik, observasi 1 jam.',
     },
   },
+
+  // 3. Kasus Gawat Darurat (Merah - Suspek Sindroma Koroner Akut, Walk-In Lansia)
   {
     id: 'q-003',
     puskesmasId: 'pusk-ngw-01',
     patientId: 'pat-003',
-    patientName: 'Pak Djoyo (Lansia)',
+    patientName: 'Pak Djoyo (Lansia - 64 th)',
     patientPhone: '081345678912',
-    ticketNumber: 'W-003',
+    ticketNumber: 'W-001',
     queueType: 'WALK_IN',
     status: 'WAITING',
     urgencyLevel: 'MERAH',
     urgencyScore: 92,
     estWaitMinP50: 2,
     estWaitMinP90: 5,
-    registeredAt: '2026-10-16T08:02:00.000Z',
+    registeredAt: minutesAgo(7),
     polyType: 'Poli Umum',
     symptomsList: ['chest_pain_severe', 'shortness_breath_severe'],
     soapDraft: {
-      subjective: 'Nyeri dada dada kiri menjalar ke punggung sejak 30 menit lalu, napas tersengal.',
-      objectiveNeeded: 'Cek saturasi O2, rekam EKG 12 lead segera, tensi kedua lengan.',
-      preliminaryAssessment: 'Suspek Sindroma Koroner Akut (UAP/NSTEMI). BUTUH TINDAKAN CEPAT.',
-      suggestedPlan: 'Alihkan ke Bed IGD segera, O2 nasal kanul 3 lpm, Aspilet 160mg kunyah, lapor dr. Sp.JP.',
+      subjective: 'Nyeri dada kiri seperti tertindih beban berat menjalar ke punggung sejak 30 menit lalu, keringat dingin, napas tersengal.',
+      objectiveNeeded: 'Evaluasi Airway Breathing Circulation (ABC), saturasi O2, rekam EKG 12 lead segera, tensi kedua lengan.',
+      preliminaryAssessment: 'Kedaruratan Kardiovaskular: Suspek Sindroma Koroner Akut (UAP/NSTEMI). BUTUH PENANGANAN CEPAT.',
+      suggestedPlan: 'Alihkan ke Ruang Tindakan/IGD segera, O2 nasal kanul 3-4 lpm, kunyah Aspilet 160mg + Clopidogrel 300mg, lapor dokter jaga & siapkan rujukan RSUD jika perlu.',
     },
   },
+
+  // 4. Kasus Reguler Non-Akut (Hijau - Kontrol Kronis / Sasaran Alihkan ke Bidan Desa)
   {
     id: 'q-004',
     puskesmasId: 'pusk-ngw-01',
     patientId: 'pat-004',
-    patientName: 'Indah Kusuma',
+    patientName: 'Indah Kusuma (52 th)',
     patientPhone: '081567890123',
-    ticketNumber: 'A-004',
+    ticketNumber: 'A-003',
     queueType: 'ONLINE',
     status: 'WAITING',
     urgencyLevel: 'HIJAU',
     urgencyScore: 12,
     estWaitMinP50: 25,
     estWaitMinP90: 38,
-    registeredAt: '2026-10-16T07:50:00.000Z',
+    recommendedDepartureTime: new Date(nowTimestamp + 10 * 60 * 1000).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+    registeredAt: minutesAgo(12),
     polyType: 'Poli Umum',
     symptomsList: ['routine_bpjs_check'],
     soapDraft: {
-      subjective: 'Kontrol rutin hipertensi bulanan, obat Amlodipine habis.',
-      objectiveNeeded: 'Tensi darah tensimeter digital/merkuri.',
-      preliminaryAssessment: 'Hipertensi Primer Derajat 1 Terkontrol.',
-      suggestedPlan: 'Lanjutkan Amlodipine 5mg 1x1 pagi, edukasi rendah garam.',
+      subjective: 'Kontrol rutin program Prolanis hipertensi bulanan, obat habis. Tidak ada keluhan pusing, mual, atau pandangan kabur.',
+      objectiveNeeded: 'Pemeriksaan tekanan darah terkalibrasi, ukur nadi istirahat, timbang berat badan.',
+      preliminaryAssessment: 'Hipertensi Primer Derajat 1 Terkontrol dalam Terapi.',
+      suggestedPlan: 'Lanjutkan Amlodipine 5mg 1x1 pagi, konseling diet rendah garam, jadwalkan kontrol 1 bulan ke depan (bisa melalui Bidan Desa/Pustu).',
     },
   },
 ];

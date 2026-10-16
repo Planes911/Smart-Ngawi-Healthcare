@@ -131,9 +131,9 @@ Akses aplikasi melalui peramban: `http://localhost:3000`
    - Ubah status: *Panggil* $\rightarrow$ *Mulai Periksa* $\rightarrow$ *Selesai*.
 
 3. **Alur Kepala Puskesmas (`/skenario`):**
-   - Buka panel **What-If**. Geser slider jumlah loket (1-5), lama layanan, dan laju kedatangan pasien.
+   - Buka panel **Simulasi Kapasitas**. Geser slider jumlah loket (1-5), lama layanan, dan laju kedatangan pasien.
    - Amati grafik histogram distribusi probabilitas waktu tunggu setelah 1.000 iterasi.
-   - Uji tombol **"Reroute Bidan Desa"** untuk melihat bagaimana desentralisasi kasus non-akut memangkas bottleneck antrean seketika.
+   - Uji tombol **"Aktifkan Smart Offload ke Bidan Desa"** untuk melihat bagaimana desentralisasi kasus non-akut memangkas bottleneck antrean seketika.
 
 ---
 

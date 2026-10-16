@@ -170,8 +170,8 @@ export default function KonfirmasiPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h4 className="text-sm font-bold text-indigo-950">Rekomendasi Waktu Berangkat</h4>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-200 text-indigo-800">
-                      Anti-Gravity
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+                      Antrean Presisi
                     </span>
                   </div>
                   <p className="text-xs text-indigo-800 mt-0.5">

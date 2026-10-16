@@ -85,9 +85,9 @@ export default function Home() {
               <div className="inline-block px-2 py-0.5 text-[11px] font-semibold bg-purple-100 text-purple-800 rounded mb-2">
                 Sisi Manajer
               </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Panel Skenario (What-If)</h3>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Simulasi Kapasitas & Beban Layanan</h3>
               <p className="text-sm text-slate-600 leading-relaxed">
-                Simulasikan 1.000 kemungkinan hari kerja: ubah jumlah loket, variabilitas layanan, dan beban kedatangan untuk melihat grafik P90 bottleneck serta load-balancing.
+                Simulasikan 1.000 kemungkinan hari kerja: analisis penambahan loket, variabilitas layanan, dan mitigasi penumpukan pasien poli.
               </p>
             </div>
             <div className="mt-6 pt-4 border-t border-slate-100">
@@ -95,7 +95,7 @@ export default function Home() {
                 href="/skenario"
                 className="inline-flex items-center gap-2 text-sm font-semibold text-purple-600 group-hover:text-purple-700"
               >
-                Eksplorasi Skenario Monte Carlo <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                Buka Simulasi Kapasitas <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
             </div>
           </div>

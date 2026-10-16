@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { runWhatIfSimulation } from '@/lib/monte-carlo';
 import { WhatIfScenarioResult } from '@/types';
 import {
   Sliders,
   BarChart3,
-  Sparkles,
   RefreshCw,
-  Zap,
+  Network,
+  Lightbulb,
 } from 'lucide-react';
 
 export default function SkenarioPage() {
@@ -19,8 +19,8 @@ export default function SkenarioPage() {
 
   const [result, setResult] = useState<WhatIfScenarioResult | null>(null);
 
-  const calculateScenario = () => {
-    // If autonomous reroute active, effective load is reduced by 30%
+  const calculateScenario = useCallback(() => {
+    // Jika rujukan berjenjang ke jejaring faskes aktif, beban poli berkurang 30%
     const effectiveLoad = rerouteActive ? Math.round(incomingPatients * 0.7) : incomingPatients;
 
     const res = runWhatIfSimulation({
@@ -31,11 +31,11 @@ export default function SkenarioPage() {
       iterations: 1000,
     });
     setResult(res);
-  };
+  }, [numCounters, avgServiceTime, incomingPatients, rerouteActive]);
 
   useEffect(() => {
     calculateScenario();
-  }, [numCounters, avgServiceTime, incomingPatients, rerouteActive]);
+  }, [calculateScenario]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -44,13 +44,13 @@ export default function SkenarioPage() {
         <div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-semibold mb-2 border border-purple-200">
             <Sliders className="w-3.5 h-3.5" />
-            <span>Tingkat 3 · Sisi Manajer (Kepala Puskesmas)</span>
+            <span>Manajemen Operasional & Perencanaan Kapasitas</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Panel Skenario "Bagaimana-Kalau" (What-If)
+            Simulasi Kapasitas & Beban Pelayanan
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Uji dampak penambahan loket, lama layanan, dan beban pasien menggunakan 1.000 iterasi Monte Carlo.
+            Proyeksi kebutuhan loket, estimasi antrean, dan mitigasi penumpukan pasien menggunakan pemodelan stokastik Monte Carlo (1.000 iterasi).
           </p>
         </div>
 
@@ -59,7 +59,7 @@ export default function SkenarioPage() {
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 text-white font-semibold text-xs sm:text-sm hover:bg-purple-700 transition-all shadow-sm"
         >
           <RefreshCw className="w-4 h-4" />
-          Jalankan Ulang Simulasi (1.000 Runs)
+          Hitung Ulang Simulasi (1.000 Iterasi)
         </button>
       </div>
 
@@ -144,32 +144,64 @@ export default function SkenarioPage() {
               </div>
             </div>
 
-            {/* Anti-Gravity Feature 3: Autonomous Mesh Re-routing */}
+            {/* Toggle: Aktifkan Smart Offload ke Bidan Desa */}
             <div className="pt-2 border-t border-slate-100">
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-teal-50 to-emerald-50 border border-teal-200">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-teal-600" />
-                    <span className="text-xs font-bold text-teal-900">Anti-Gravity Reroute Bidan Desa</span>
+              <div
+                onClick={() => setRerouteActive(!rerouteActive)}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer select-none ${
+                  rerouteActive
+                    ? 'bg-gradient-to-br from-teal-50 to-emerald-50 border-teal-300 shadow-xs'
+                    : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-start gap-2.5">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+                      rerouteActive ? 'bg-teal-600 text-white shadow-sm' : 'bg-slate-200 text-slate-500'
+                    }`}>
+                      <Network className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-bold text-slate-900">
+                          Aktifkan Smart Offload ke Bidan Desa
+                        </span>
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border transition-colors ${
+                          rerouteActive
+                            ? 'bg-teal-100 text-teal-800 border-teal-200'
+                            : 'bg-slate-200 text-slate-600 border-slate-300'
+                        }`}>
+                          {rerouteActive ? 'Aktif (-30% Poli)' : 'Nonaktif'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-relaxed mt-1">
+                        Pemerataan beban faskes: Kasus ringan & kontrol rutin dialihkan otomatis ke jejaring Pustu & Bidan Desa terdekat.
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-teal-200 text-teal-800">
-                    Elastic
-                  </span>
+
+                  {/* Toggle Switch */}
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={rerouteActive}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRerouteActive(!rerouteActive);
+                    }}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 ${
+                      rerouteActive ? 'bg-teal-600' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span className="sr-only">Aktifkan Smart Offload ke Bidan Desa</span>
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        rerouteActive ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                 </div>
-                <p className="text-[11px] text-teal-700 leading-relaxed mb-3">
-                  Aktifkan desentralisasi beban: Kasus non-akut dialihkan ke Bidan Desa / Poskesdes sekitar Puskesmas.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setRerouteActive(!rerouteActive)}
-                  className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                    rerouteActive
-                      ? 'bg-teal-600 text-white shadow-sm'
-                      : 'bg-white text-teal-800 border border-teal-300 hover:bg-teal-100/50'
-                  }`}
-                >
-                  {rerouteActive ? '✓ Reroute Otonom Aktif (-30% Beban Poli)' : 'Aktifkan Reroute Bidan Desa'}
-                </button>
               </div>
             </div>
           </div>
@@ -247,7 +279,7 @@ export default function SkenarioPage() {
                 </div>
               </div>
 
-              {/* AI Strategic Recommendation Box */}
+              {/* Rekomendasi Operasional Box */}
               <div className={`p-5 rounded-3xl border ${
                 result.autonomousLoadSheddingTriggered
                   ? 'bg-amber-50/70 border-amber-300'
@@ -257,11 +289,11 @@ export default function SkenarioPage() {
                   <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
                     result.autonomousLoadSheddingTriggered ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'
                   }`}>
-                    <Sparkles className="w-4 h-4" />
+                    <Lightbulb className="w-4 h-4" />
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-slate-900">
-                      Rekomendasi Kapasitas untuk Kepala Puskesmas
+                      Rekomendasi Operasional Kepala Puskesmas
                     </h4>
                     <p className="text-xs text-slate-700 mt-1 leading-relaxed">
                       {result.recommendation}
@@ -272,7 +304,7 @@ export default function SkenarioPage() {
                           onClick={() => setRerouteActive(true)}
                           className="px-4 py-2 rounded-xl bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 shadow-sm transition-all"
                         >
-                          Coba Terapkan 'Reroute Bidan Desa' Sekarang
+                          Aktifkan Smart Offload ke Bidan Desa
                         </button>
                       </div>
                     )}

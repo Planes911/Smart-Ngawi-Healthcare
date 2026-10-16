@@ -369,12 +369,12 @@ export default function PetugasDashboard() {
                       </button>
                     )}
 
-                    {/* Anti-Gravity Reroute Button */}
+                    {/* Smart Offload ke Bidan Desa */}
                     {t.status === 'WAITING' && t.urgencyLevel === 'HIJAU' && (
                       <button
                         onClick={() => handleUpdateStatus(t.id, 'REROUTED')}
                         className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200"
-                        title="Alihkan ke Bidan Desa Terdekat (Anti-Gravity Load Balancing)"
+                        title="Smart Offload: Alihkan ke Jejaring Pustu / Bidan Desa Terdekat (Pemerataan Beban Layanan)"
                       >
                         Alihkan Bidan
                       </button>

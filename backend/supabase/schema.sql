@@ -143,3 +143,88 @@ ON CONFLICT (code) DO NOTHING;
 
 -- ENABLE REALTIME ON SUPABASE FOR QUEUE TICKETS
 ALTER PUBLICATION supabase_realtime ADD TABLE queue_tickets;
+
+-- ==============================================================================
+-- 9. SEED DATA DUMMY 4 SKENARIO KLINIS UNTUK PENGUJIAN JURI
+-- Menyiapkan 4 pasien dengan variasi triase (Merah, Kuning, Hijau periksa, Hijau kontrol)
+-- ==============================================================================
+DO $$
+DECLARE
+    pusk_id UUID;
+    pat1 UUID;
+    pat2 UUID;
+    pat3 UUID;
+    pat4 UUID;
+    bk1 UUID;
+    bk2 UUID;
+    bk3 UUID;
+    bk4 UUID;
+BEGIN
+    SELECT id INTO pusk_id FROM puskesmas WHERE code = 'NGW-001' LIMIT 1;
+    IF pusk_id IS NOT NULL THEN
+        -- Pasien 1: Bambang Supriyanto (Sedang Diperiksa, Hijau)
+        INSERT INTO patients (nik, full_name, phone, bpjs_number, gender)
+        VALUES ('3521011508910001', 'Bambang Supriyanto', '081234567890', '0001234567891', 'L')
+        ON CONFLICT DO NOTHING;
+        SELECT id INTO pat1 FROM patients WHERE nik = '3521011508910001' LIMIT 1;
+
+        -- Pasien 2: Siti Rahmawati (Kuning, Dehidrasi Akut)
+        INSERT INTO patients (nik, full_name, phone, bpjs_number, gender)
+        VALUES ('3521015204820002', 'Siti Rahmawati', '081298765432', '0001234567892', 'P')
+        ON CONFLICT DO NOTHING;
+        SELECT id INTO pat2 FROM patients WHERE nik = '3521015204820002' LIMIT 1;
+
+        -- Pasien 3: Pak Djoyo (Merah, Suspek ACS, Walk-In)
+        INSERT INTO patients (nik, full_name, phone, bpjs_number, gender)
+        VALUES ('3521010107600003', 'Pak Djoyo (Lansia - 64 th)', '081345678912', '0001234567893', 'L')
+        ON CONFLICT DO NOTHING;
+        SELECT id INTO pat3 FROM patients WHERE nik = '3521010107600003' LIMIT 1;
+
+        -- Pasien 4: Indah Kusuma (Hijau, Kontrol Rutin Hipertensi)
+        INSERT INTO patients (nik, full_name, phone, bpjs_number, gender)
+        VALUES ('3521014509720004', 'Indah Kusuma (52 th)', '081567890123', '0001234567894', 'P')
+        ON CONFLICT DO NOTHING;
+        SELECT id INTO pat4 FROM patients WHERE nik = '3521014509720004' LIMIT 1;
+
+        -- Bookings
+        INSERT INTO bookings (puskesmas_id, patient_id, booking_date, time_slot, poly_type)
+        VALUES (pusk_id, pat1, CURRENT_DATE, '08:00 - 09:00', 'Poli Umum') RETURNING id INTO bk1;
+        INSERT INTO bookings (puskesmas_id, patient_id, booking_date, time_slot, poly_type)
+        VALUES (pusk_id, pat2, CURRENT_DATE, '08:00 - 09:00', 'Poli Umum') RETURNING id INTO bk2;
+        INSERT INTO bookings (puskesmas_id, patient_id, booking_date, time_slot, poly_type)
+        VALUES (pusk_id, pat3, CURRENT_DATE, 'WALK-IN', 'Poli Umum') RETURNING id INTO bk3;
+        INSERT INTO bookings (puskesmas_id, patient_id, booking_date, time_slot, poly_type)
+        VALUES (pusk_id, pat4, CURRENT_DATE, '08:00 - 09:00', 'Poli Umum') RETURNING id INTO bk4;
+
+        -- Symptoms
+        INSERT INTO symptoms (booking_id, patient_id, symptoms_list, duration_days, severity_self_rating)
+        VALUES (bk1, pat1, '["cough_mild", "runny_nose"]'::jsonb, 3, 2);
+        INSERT INTO symptoms (booking_id, patient_id, symptoms_list, duration_days, severity_self_rating)
+        VALUES (bk2, pat2, '["acute_abdominal_pain", "severe_vomiting_diarrhea"]'::jsonb, 1, 4);
+        INSERT INTO symptoms (booking_id, patient_id, symptoms_list, duration_days, severity_self_rating, has_emergency_red_flag)
+        VALUES (bk3, pat3, '["chest_pain_severe", "shortness_breath_severe"]'::jsonb, 1, 5, true);
+        INSERT INTO symptoms (booking_id, patient_id, symptoms_list, duration_days, severity_self_rating)
+        VALUES (bk4, pat4, '["routine_bpjs_check"]'::jsonb, 30, 1);
+
+        -- Triage Results
+        INSERT INTO triage_results (booking_id, patient_id, urgency_level, urgency_score, ai_soap_draft)
+        VALUES (bk1, pat1, 'HIJAU', 18, '{"subjective": "Batuk berdahak 3 hari, pilek, demam sumer.", "objectiveNeeded": "Auskultasi paru dan suhu aksila.", "preliminaryAssessment": "ISPA Akut Ringan.", "suggestedPlan": "Guaifenesin oral, parasetamol prn."}'::jsonb);
+        INSERT INTO triage_results (booking_id, patient_id, urgency_level, urgency_score, ai_soap_draft)
+        VALUES (bk2, pat2, 'KUNING', 55, '{"subjective": "BAB cair > 6x, muntah, badan lemas, rasa haus.", "objectiveNeeded": "Cek turgor kulit, tensi dan nadi postural.", "preliminaryAssessment": "GEA dengan Dehidrasi Sedang.", "suggestedPlan": "Oralit ad libitum, Zinc 20mg, observasi 1 jam."}'::jsonb);
+        INSERT INTO triage_results (booking_id, patient_id, urgency_level, urgency_score, ai_soap_draft)
+        VALUES (bk3, pat3, 'MERAH', 92, '{"subjective": "Nyeri dada substernal tembus punggung, napas tersengal, keringat dingin.", "objectiveNeeded": "ABC, SpO2, EKG 12-lead segera.", "preliminaryAssessment": "Suspek Sindroma Koroner Akut (UAP/NSTEMI).", "suggestedPlan": "Bed IGD segera, O2 nasal kanul, Aspilet 160mg kunyah."}'::jsonb);
+        INSERT INTO triage_results (booking_id, patient_id, urgency_level, urgency_score, ai_soap_draft)
+        VALUES (bk4, pat4, 'HIJAU', 12, '{"subjective": "Kontrol rutin tensi Prolanis, obat habis.", "objectiveNeeded": "Tensi darah dan cek nadi.", "preliminaryAssessment": "Hipertensi Primer Derajat 1 Terkontrol.", "suggestedPlan": "Lanjutkan Amlodipine 5mg, edukasi rendah garam."}'::jsonb);
+
+        -- Queue Tickets
+        INSERT INTO queue_tickets (puskesmas_id, booking_id, patient_id, ticket_number, queue_type, status, urgency_level, urgency_score, est_wait_min_p50, est_wait_min_p90, assigned_counter, registered_at, service_started_at)
+        VALUES (pusk_id, bk1, pat1, 'A-001', 'ONLINE', 'EXAMINING', 'HIJAU', 18, 0, 5, 'Poli Umum 1', NOW() - INTERVAL '25 minutes', NOW() - INTERVAL '6 minutes');
+        INSERT INTO queue_tickets (puskesmas_id, booking_id, patient_id, ticket_number, queue_type, status, urgency_level, urgency_score, est_wait_min_p50, est_wait_min_p90, registered_at)
+        VALUES (pusk_id, bk2, pat2, 'A-002', 'ONLINE', 'WAITING', 'KUNING', 55, 12, 18, NOW() - INTERVAL '16 minutes');
+        INSERT INTO queue_tickets (puskesmas_id, booking_id, patient_id, ticket_number, queue_type, status, urgency_level, urgency_score, est_wait_min_p50, est_wait_min_p90, registered_at)
+        VALUES (pusk_id, bk3, pat3, 'W-001', 'WALK_IN', 'WAITING', 'MERAH', 92, 2, 5, NOW() - INTERVAL '7 minutes');
+        INSERT INTO queue_tickets (puskesmas_id, booking_id, patient_id, ticket_number, queue_type, status, urgency_level, urgency_score, est_wait_min_p50, est_wait_min_p90, registered_at)
+        VALUES (pusk_id, bk4, pat4, 'A-003', 'ONLINE', 'WAITING', 'HIJAU', 12, 25, 38, NOW() - INTERVAL '12 minutes');
+    END IF;
+END $$;
+
