@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "@types/qrcode.react": "^3.0.0",
     "lucide-react": "^1.57.0",
     "next": "14.2.35",
