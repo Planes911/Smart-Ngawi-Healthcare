@@ -4,6 +4,8 @@
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { PUSKESMAS_NGAWI } from "./mock-store";
+import * as mockStore from "./mock-store";
+import { isSupabaseConfigured } from "./supabase-client";
 import type {
   MonteCarloSimulationResult,
   QueueStatus,
@@ -13,11 +15,12 @@ import type {
 } from "@/types";
 
 let _db: SupabaseClient | null = null;
-export function getDb(): SupabaseClient {
+export function getDb(): SupabaseClient | null {
+  if (!isSupabaseConfigured) return null;
   if (!_db) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !key) throw new Error("NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY belum diisi");
+    if (!url || !key) return null;
     _db = createClient(url, key, { auth: { persistSession: false } });
   }
   return _db;
@@ -37,7 +40,9 @@ async function puskesmasUuid(idOrCode?: string): Promise<string> {
   const p = findPuskesmas(idOrCode);
   const cached = uuidCache.get(p.code);
   if (cached) return cached;
-  const { data, error } = await getDb().from("puskesmas").select("id").eq("code", p.code).single();
+  const db = getDb();
+  if (!db) return p.id;
+  const { data, error } = await db.from("puskesmas").select("id").eq("code", p.code).single();
   if (error || !data) throw new Error(`Puskesmas ${p.code} tidak ada di database (sudah menjalankan schema.sql?)`);
   uuidCache.set(p.code, data.id);
   return data.id;
@@ -77,19 +82,29 @@ function toTicket(r: any): QueueTicket {
 
 /** Tiket hari ini, urut: sedang diperiksa -> urgensi (MERAH>KUNING>HIJAU) -> waktu daftar */
 export async function getTickets(puskesmasId?: string): Promise<QueueTicket[]> {
-  let q = getDb().from("queue_tickets").select(TICKET_SELECT).gte("registered_at", `${todayWIB()}T00:00:00+07:00`).limit(300);
-  if (puskesmasId) q = q.eq("puskesmas_id", await puskesmasUuid(puskesmasId));
-  const { data, error } = await q;
-  if (error) throw new Error(error.message);
+  const db = getDb();
+  if (!db) {
+    return mockStore.getTickets(puskesmasId);
+  }
 
-  const w = { MERAH: 3, KUNING: 2, HIJAU: 1 } as const;
-  const tickets: QueueTicket[] = ((data ?? []) as any[]).map(toTicket);
-  return tickets.sort((a, b) => {
-    if (a.status === "EXAMINING" && b.status !== "EXAMINING") return -1;
-    if (b.status === "EXAMINING" && a.status !== "EXAMINING") return 1;
-    const d = w[b.urgencyLevel] - w[a.urgencyLevel];
-    return d !== 0 ? d : new Date(a.registeredAt).getTime() - new Date(b.registeredAt).getTime();
-  });
+  try {
+    let q = db.from("queue_tickets").select(TICKET_SELECT).gte("registered_at", `${todayWIB()}T00:00:00+07:00`).limit(300);
+    if (puskesmasId) q = q.eq("puskesmas_id", await puskesmasUuid(puskesmasId));
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+
+    const w = { MERAH: 3, KUNING: 2, HIJAU: 1 } as const;
+    const tickets: QueueTicket[] = ((data ?? []) as any[]).map(toTicket);
+    return tickets.sort((a, b) => {
+      if (a.status === "EXAMINING" && b.status !== "EXAMINING") return -1;
+      if (b.status === "EXAMINING" && a.status !== "EXAMINING") return 1;
+      const d = w[b.urgencyLevel] - w[a.urgencyLevel];
+      return d !== 0 ? d : new Date(a.registeredAt).getTime() - new Date(b.registeredAt).getTime();
+    });
+  } catch (err) {
+    console.warn("Supabase getTickets error, falling back to mock store:", err);
+    return mockStore.getTickets(puskesmasId);
+  }
 }
 
 export async function countWaiting(puskesmasId?: string): Promise<number> {
@@ -98,20 +113,30 @@ export async function countWaiting(puskesmasId?: string): Promise<number> {
 }
 
 export async function updateTicketStatus(id: string, status: QueueStatus, assignedCounter?: string): Promise<QueueTicket | null> {
-  const now = new Date().toISOString();
-  const patch: Record<string, unknown> = { status };
-  if (assignedCounter) patch.assigned_counter = assignedCounter;
-  if (status === "CALLED") patch.called_at = now;
-  if (status === "EXAMINING") patch.service_started_at = now;
-  if (status === "COMPLETED") patch.completed_at = now;
-
-  const { data, error } = await getDb().from("queue_tickets").update(patch).eq("id", id).select(TICKET_SELECT).maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) return null;
-  if (status === "COMPLETED" && data.booking_id) {
-    await getDb().from("bookings").update({ status: "ATTENDED" }).eq("id", data.booking_id);
+  const db = getDb();
+  if (!db) {
+    return mockStore.updateTicketStatus(id, status, assignedCounter);
   }
-  return toTicket(data);
+
+  try {
+    const now = new Date().toISOString();
+    const patch: Record<string, unknown> = { status };
+    if (assignedCounter) patch.assigned_counter = assignedCounter;
+    if (status === "CALLED") patch.called_at = now;
+    if (status === "EXAMINING") patch.service_started_at = now;
+    if (status === "COMPLETED") patch.completed_at = now;
+
+    const { data, error } = await db.from("queue_tickets").update(patch).eq("id", id).select(TICKET_SELECT).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) return mockStore.updateTicketStatus(id, status, assignedCounter);
+    if (status === "COMPLETED" && data.booking_id) {
+      await db.from("bookings").update({ status: "ATTENDED" }).eq("id", data.booking_id);
+    }
+    return toTicket(data);
+  } catch (err) {
+    console.warn("Supabase updateTicketStatus error, falling back to mock store:", err);
+    return mockStore.updateTicketStatus(id, status, assignedCounter);
+  }
 }
 
 export interface RegistrationInput {
@@ -137,64 +162,94 @@ export interface RegistrationInput {
 
 /** Simpan satu pendaftaran utuh: pasien -> booking -> gejala -> hasil triase -> tiket antrean */
 export async function createRegistration(i: RegistrationInput): Promise<{ ticket: QueueTicket; bookingId: string }> {
+  const p = findPuskesmas(i.puskesmasId);
+  const fallbackCreate = () => {
+    const ticket = mockStore.addTicket({
+      puskesmasId: p.id,
+      patientId: `pat-${Date.now()}`,
+      patientName: i.patientName,
+      patientPhone: i.patientPhone || '-',
+      queueType: i.queueType,
+      status: 'WAITING',
+      urgencyLevel: i.triage.urgencyLevel,
+      urgencyScore: i.triage.urgencyScore,
+      estWaitMinP50: i.simulation.p50Minutes,
+      estWaitMinP90: i.simulation.p90Minutes,
+      recommendedDepartureTime: i.simulation.recommendedDepartureTime,
+      polyType: i.polyType,
+      symptomsList: i.symptomIds,
+      soapDraft: i.triage.soapDraft,
+    });
+    return { ticket, bookingId: `bk-${Date.now()}` };
+  };
+
   const db = getDb();
-  const puskesmasUuidValue = await puskesmasUuid(i.puskesmasId);
-
-  // 1. Pasien (pakai ulang bila NIK / nama+HP sama, agar riwayat kunjungan tersambung)
-  const nik = (i.nik ?? "").trim();
-  let patientId: string | undefined;
-  if (nik.length === 16) {
-    const { data } = await db.from("patients").select("id").eq("nik", nik).limit(1);
-    patientId = data?.[0]?.id;
-  } else if (i.patientPhone) {
-    const { data } = await db.from("patients").select("id").eq("full_name", i.patientName).eq("phone", i.patientPhone).limit(1);
-    patientId = data?.[0]?.id;
+  if (!db) {
+    return fallbackCreate();
   }
-  if (!patientId) {
-    const { data, error } = await db.from("patients")
-      .insert({ nik: nik || "-", full_name: i.patientName, phone: i.patientPhone || "-", bpjs_number: i.bpjsNumber || null })
+
+  try {
+    const puskesmasUuidValue = await puskesmasUuid(i.puskesmasId);
+
+    // 1. Pasien (pakai ulang bila NIK / nama+HP sama, agar riwayat kunjungan tersambung)
+    const nik = (i.nik ?? "").trim();
+    let patientId: string | undefined;
+    if (nik.length === 16) {
+      const { data } = await db.from("patients").select("id").eq("nik", nik).limit(1);
+      patientId = data?.[0]?.id;
+    } else if (i.patientPhone) {
+      const { data } = await db.from("patients").select("id").eq("full_name", i.patientName).eq("phone", i.patientPhone).limit(1);
+      patientId = data?.[0]?.id;
+    }
+    if (!patientId) {
+      const { data, error } = await db.from("patients")
+        .insert({ nik: nik || "-", full_name: i.patientName, phone: i.patientPhone || "-", bpjs_number: i.bpjsNumber || null })
+        .select("id").single();
+      if (error) throw new Error(error.message);
+      patientId = data.id as string;
+    }
+
+    // 2. Booking
+    const { data: bk, error: e2 } = await db.from("bookings")
+      .insert({ puskesmas_id: puskesmasUuidValue, patient_id: patientId, booking_date: i.bookingDate, time_slot: i.timeSlot, poly_type: i.polyType })
       .select("id").single();
-    if (error) throw new Error(error.message);
-    patientId = data.id as string;
+      if (e2) throw new Error(e2.message);
+    const bookingId = bk.id as string;
+
+    // 3. Checklist gejala
+    const { error: e3 } = await db.from("symptoms").insert({
+      booking_id: bookingId, patient_id: patientId, symptoms_list: i.symptomIds,
+      duration_days: i.durationDays, severity_self_rating: i.severityRating,
+      has_comorbidities: i.hasComorbidities, comorbidities_notes: i.comorbiditiesNotes || null,
+      free_text_complaint: i.freeTextComplaint || null, has_emergency_red_flag: i.hasEmergencyRedFlags,
+    });
+    if (e3) throw new Error(e3.message);
+
+    // 4. Hasil triase (+ penjelasan)
+    const { error: e4 } = await db.from("triage_results").insert({
+      booking_id: bookingId, patient_id: patientId,
+      urgency_level: i.triage.urgencyLevel, urgency_score: i.triage.urgencyScore,
+      rule_flags: i.triage.triggeredRules, ai_summary: i.triage.patientExplanation, ai_soap_draft: i.triage.soapDraft,
+    });
+    if (e4) throw new Error(e4.message);
+
+    // 5. Tiket antrean: nomor = jumlah tiket hari ini di puskesmas itu + 1
+    const { count } = await db.from("queue_tickets").select("id", { count: "exact", head: true })
+      .eq("puskesmas_id", puskesmasUuidValue).gte("registered_at", `${todayWIB()}T00:00:00+07:00`);
+    const ticketNumber = `${i.queueType === "ONLINE" ? "A" : "W"}-${String((count ?? 0) + 1).padStart(3, "0")}`;
+
+    const { data: tk, error: e5 } = await db.from("queue_tickets").insert({
+      puskesmas_id: puskesmasUuidValue, booking_id: bookingId, patient_id: patientId,
+      ticket_number: ticketNumber, queue_type: i.queueType, status: "WAITING",
+      urgency_level: i.triage.urgencyLevel, urgency_score: i.triage.urgencyScore,
+      est_wait_min_p50: i.simulation.p50Minutes, est_wait_min_p90: i.simulation.p90Minutes,
+      recommended_departure_time: i.simulation.recommendedDepartureTime,
+    }).select(TICKET_SELECT).single();
+    if (e5) throw new Error(e5.message);
+
+    return { ticket: toTicket(tk), bookingId };
+  } catch (err) {
+    console.warn("Supabase createRegistration error, falling back to mock store:", err);
+    return fallbackCreate();
   }
-
-  // 2. Booking
-  const { data: bk, error: e2 } = await db.from("bookings")
-    .insert({ puskesmas_id: puskesmasUuidValue, patient_id: patientId, booking_date: i.bookingDate, time_slot: i.timeSlot, poly_type: i.polyType })
-    .select("id").single();
-  if (e2) throw new Error(e2.message);
-  const bookingId = bk.id as string;
-
-  // 3. Checklist gejala
-  const { error: e3 } = await db.from("symptoms").insert({
-    booking_id: bookingId, patient_id: patientId, symptoms_list: i.symptomIds,
-    duration_days: i.durationDays, severity_self_rating: i.severityRating,
-    has_comorbidities: i.hasComorbidities, comorbidities_notes: i.comorbiditiesNotes || null,
-    free_text_complaint: i.freeTextComplaint || null, has_emergency_red_flag: i.hasEmergencyRedFlags,
-  });
-  if (e3) throw new Error(e3.message);
-
-  // 4. Hasil triase (+ penjelasan)
-  const { error: e4 } = await db.from("triage_results").insert({
-    booking_id: bookingId, patient_id: patientId,
-    urgency_level: i.triage.urgencyLevel, urgency_score: i.triage.urgencyScore,
-    rule_flags: i.triage.triggeredRules, ai_summary: i.triage.patientExplanation, ai_soap_draft: i.triage.soapDraft,
-  });
-  if (e4) throw new Error(e4.message);
-
-  // 5. Tiket antrean: nomor = jumlah tiket hari ini di puskesmas itu + 1
-  const { count } = await db.from("queue_tickets").select("id", { count: "exact", head: true })
-    .eq("puskesmas_id", puskesmasUuidValue).gte("registered_at", `${todayWIB()}T00:00:00+07:00`);
-  const ticketNumber = `${i.queueType === "ONLINE" ? "A" : "W"}-${String((count ?? 0) + 1).padStart(3, "0")}`;
-
-  const { data: tk, error: e5 } = await db.from("queue_tickets").insert({
-    puskesmas_id: puskesmasUuidValue, booking_id: bookingId, patient_id: patientId,
-    ticket_number: ticketNumber, queue_type: i.queueType, status: "WAITING",
-    urgency_level: i.triage.urgencyLevel, urgency_score: i.triage.urgencyScore,
-    est_wait_min_p50: i.simulation.p50Minutes, est_wait_min_p90: i.simulation.p90Minutes,
-    recommended_departure_time: i.simulation.recommendedDepartureTime,
-  }).select(TICKET_SELECT).single();
-  if (e5) throw new Error(e5.message);
-
-  return { ticket: toTicket(tk), bookingId };
 }

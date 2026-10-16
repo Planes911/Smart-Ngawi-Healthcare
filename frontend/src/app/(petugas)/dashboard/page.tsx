@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { QueueTicket, QueueStatus } from '@/types';
 import { getUrgencyBadge, getStatusBadge, formatTimeAgo } from '@/lib/utils';
 import { PUSKESMAS_NGAWI } from '@/lib/mock-store';
@@ -35,7 +35,7 @@ export default function PetugasDashboard() {
   const [walkInSeverity, setWalkInSeverity] = useState<number>(2);
   const [isSubmittingWalkIn, setIsSubmittingWalkIn] = useState<boolean>(false);
 
-  const fetchTickets = async () => {
+  const fetchTickets = useCallback(async () => {
     try {
       const res = await fetch(`/api/queue?puskesmasId=${selectedPuskesmas}`);
       const data = await res.json();
@@ -47,18 +47,18 @@ export default function PetugasDashboard() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedPuskesmas]);
 
   useEffect(() => {
     fetchTickets();
     const interval = setInterval(fetchTickets, 5000); // Polling every 5 seconds for realtime feel
     return () => clearInterval(interval);
-  }, [selectedPuskesmas]);
+  }, [fetchTickets]);
 
   // Supabase Realtime: segarkan antrean begitu ada perubahan (polling di atas jadi cadangan)
   useEffect(() => {
     return subscribeQueueChanges(() => { fetchTickets(); });
-  }, [selectedPuskesmas]);
+  }, [fetchTickets]);
 
   const handleUpdateStatus = async (ticketId: string, newStatus: QueueStatus, counter?: string) => {
     try {
@@ -134,15 +134,28 @@ export default function PetugasDashboard() {
       {/* Top Bar with Puskesmas Selector & Walk-In Button */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Dashboard Antrean Petugas</h1>
-            <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-teal-100 text-teal-800 border border-teal-200">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Dashboard Antrean Petugas</h1>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-full bg-teal-50 text-teal-700 border border-teal-200 shadow-sm">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
+              </span>
               Live Real-Time
             </span>
           </div>
-          <p className="text-sm text-slate-500 mt-1">
-            Prioritas otomatis berdasarkan triase klinis (Merah $\rightarrow$ Kuning $\rightarrow$ Hijau) & waktu kedatangan.
-          </p>
+          <div className="text-sm text-slate-500 mt-2 flex items-center flex-wrap gap-2">
+            <span>Prioritas otomatis triase klinis:</span>
+            <div className="inline-flex items-center gap-1 text-xs font-bold">
+              <span className="px-2 py-0.5 rounded-md bg-red-100 text-red-700 border border-red-200">Merah (Darurat)</span>
+              <span className="text-slate-400 font-bold">→</span>
+              <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 border border-amber-200">Kuning (Mendesak)</span>
+              <span className="text-slate-400 font-bold">→</span>
+              <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 border border-emerald-200">Hijau (Reguler)</span>
+            </div>
+            <span className="text-slate-300">·</span>
+            <span className="text-xs text-slate-500">diurutkan bersama waktu kedatangan</span>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
