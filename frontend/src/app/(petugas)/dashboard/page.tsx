@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { QueueTicket, QueueStatus } from '@/types';
 import { getUrgencyBadge, getStatusBadge, formatTimeAgo } from '@/lib/utils';
 import { PUSKESMAS_NGAWI } from '@/lib/mock-store';
+import { subscribeQueueChanges } from '@/lib/realtime';
 import {
   Activity,
   UserPlus,
@@ -52,6 +53,11 @@ export default function PetugasDashboard() {
     fetchTickets();
     const interval = setInterval(fetchTickets, 5000); // Polling every 5 seconds for realtime feel
     return () => clearInterval(interval);
+  }, [selectedPuskesmas]);
+
+  // Supabase Realtime: segarkan antrean begitu ada perubahan (polling di atas jadi cadangan)
+  useEffect(() => {
+    return subscribeQueueChanges(() => { fetchTickets(); });
   }, [selectedPuskesmas]);
 
   const handleUpdateStatus = async (ticketId: string, newStatus: QueueStatus, counter?: string) => {
