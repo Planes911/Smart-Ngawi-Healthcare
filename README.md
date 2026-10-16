@@ -11,7 +11,7 @@ Alih-alih memberikan nomor antrean statis dan perkiraan waktu berbasis rata-rata
 
 ---
 
-## 🚀 4 Pilar Inovasi "Anti-Gravity"
+## 🚀 4 Pilar Inovasi
 1. **Pre-Triase Klinis Otomatis (Adaptasi Manchester Triage System):**
    Memisahkan kasus gawat darurat (Merah/IGD), prioritas mendesak (Kuning), dan reguler (Hijau) sejak dari rumah pasien.
 2. **Estimasi Waktu Tunggu yang Jujur (Monte Carlo P50 - P90):**
